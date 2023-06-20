@@ -5,6 +5,11 @@ import networkx as nx
 import circuits
 import helpers
 import evaluate
+import rules_based_mixer
+import gates
+
+import scipy as sp
+import scipy.linalg
 
 # Tests for helpers
 assert np.all(helpers.int2bits(1, 4) == [1, 0, 0, 0])
@@ -148,6 +153,120 @@ circ3.update_quantum_state(state3)
 
 assert np.all(np.isclose(state3.get_vector(), [0, 0, 0, -1]))
 print("BILP tests passed!")
+
+# tests for split and fusion/fission operators
+n = 6
+
+initial_state = helpers.bits2state([1, 1, 0, 0, 0, 0])
+F012 = rules_based_mixer.get_F(0, 1, 2, n).get_matrix().todense()
+S25 = rules_based_mixer.get_S(2, 5, n).get_matrix().todense()
+S14 = rules_based_mixer.get_S(1, 4, n).get_matrix().todense()
+F045 = rules_based_mixer.get_F(0, 4, 5, n).get_matrix().todense()
+
+state_vec1 = S14 @ initial_state.get_vector()
+state1 = q.QuantumState(n)
+state1.load(np.array(state_vec1).squeeze().tolist())
+assert np.all(helpers.state2bits(state1) == [1, 0, 0, 0, 1, 0])
+
+state_vec2 = F012 @ initial_state.get_vector()
+state2 = q.QuantumState(n)
+state2.load(np.array(state_vec2).squeeze().tolist())
+assert np.all(helpers.state2bits(state2) == [0, 0, 1, 0, 0, 0])
+
+state_vec3 = S25 @ initial_state.get_vector()
+assert np.all(state_vec3 == 0)
+
+state_vec4 = F045 @ S14 @ initial_state.get_vector()
+state4 = q.QuantumState(n)
+state4.load(np.array(state_vec4).squeeze().tolist())
+assert np.all(helpers.state2bits(state4) == [0, 0, 0, 0, 0, 1])
+print("Swap and Fusion/Fission tests passed!")
+
+# Gates mixer preserves subspace
+
+S = np.array([[1, 2, 3, 1, 2, 3]])
+b = np.array([[7]])
+k = 3
+n = 6
+
+def constraint_BILP(alpha, z):
+    return np.dot(z, S[alpha, :]) == b[alpha, 0]
+
+subspace = [i for i in range(2**n) if constraint_BILP(0, helpers.int2bits(i, n))]
+initial_state = np.zeros(2**n)
+for state in subspace:
+    initial_state[state] += 1
+initial_state /= np.linalg.norm(initial_state)
+
+
+
+# Make sure custom operators have expected behavior
+def F(theta):
+    XXX = (q.Observable(6) + q.PauliOperator("X 0 X 1 X 2", 1)).get_matrix().todense()
+    XYY = (q.Observable(6) + q.PauliOperator("X 0 Y 1 Y 2", 1)).get_matrix().todense()
+    YXY = (q.Observable(6) + q.PauliOperator("Y 0 X 1 Y 2", 1)).get_matrix().todense()
+    YYX = (q.Observable(6) + q.PauliOperator("Y 0 Y 1 X 2", 1)).get_matrix().todense()
+    F = 1/4 * (XXX + XYY + YXY - YYX)
+    return sp.linalg.expm(-1j * F * theta)
+
+def S(theta):
+    XX = (q.Observable(6) + q.PauliOperator("X 0 X 3", 1)).get_matrix().todense()
+    YY = (q.Observable(6) + q.PauliOperator("Y 0 Y 3", 1)).get_matrix().todense()
+    S = 1/2 * (XX + YY)
+    return sp.linalg.expm(-1j * S * theta)
+
+for i in range(8):
+    for beta in np.linspace(0, np.pi*2, 20):
+        F_state1 = helpers.int2state(i, 6)
+        F_state2 = helpers.int2state(i, 6)
+        F_sv = F_state2.get_vector()
+
+        S_state1 = helpers.int2state(i, 6)
+        S_state2 = helpers.int2state(i, 6)
+        S_sv = S_state2.get_vector()
+
+        F_circ1 = q.QuantumCircuit(6)
+        F_circ2 = q.ParametricQuantumCircuit(6)
+        F_c3 = F(beta)
+
+        S_circ1 = q.QuantumCircuit(6)
+        S_circ2 = q.ParametricQuantumCircuit(6)
+        S_c3 = S(beta)
+
+        gates.add_F_gate(F_circ1, 0, 1, 2, beta)
+        gates.add_param_F_gate(F_circ2, 0, 1, 2, beta)
+        gates.add_S_gate(S_circ1, 0, 3, beta)
+        gates.add_param_S_gate(S_circ2, 0, 3, beta)
+
+        F_circ1.update_quantum_state(F_state1)
+        F_circ2.update_quantum_state(F_state2)
+        F_sv = F_c3 @ F_sv
+
+        S_circ1.update_quantum_state(F_state1)
+        S_circ2.update_quantum_state(F_state2)
+        S_sv = S_c3 @ S_sv
+
+        
+
+        assert np.all(np.isclose(F_state1.get_vector(), F_state2.get_vector()))
+        assert np.all(np.isclose(F_state1.get_vector(), F_sv))
+
+        assert np.all(np.isclose(S_state1.get_vector(), S_state2.get_vector()))
+        assert np.all(np.isclose(S_state1.get_vector(), S_sv))
+        
+# assert helpers.preserves_subspace(lambda b: sp.linalg.expm(-1j * b * F012), subspace, n)
+
+assert helpers.preserves_subspace_gates(lambda c, b: gates.add_F_gate(c, 0, 1, 2, b), subspace, n)
+assert helpers.preserves_subspace_gates(lambda c, b: gates.add_S_gate(c, 0, 3, b), subspace, n)
+assert helpers.preserves_subspace_gates(lambda c, b: gates.add_S_gate(c, 0, 3, b), subspace, n)
+
+# assert helpers.preserves_subspace_gates(lambda c, b: gates.add_param_F_gate(c, 0, 1, 2, b), subspace, n)
+# assert helpers.preserves_subspace_gates(lambda c, b: gates.add_param_F_gate(c, 0, 3, 1, b), subspace, n)
+# assert helpers.preserves_subspace_gates(lambda c, b: gates.add_param_S_gate(c, 0, 3, b), subspace, n)
+
+
+
+
 
 
 

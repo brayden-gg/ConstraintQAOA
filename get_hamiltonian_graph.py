@@ -76,9 +76,9 @@ def check_commutator(M):
 def constraint(zs):
     S = np.zeros_like(zs)
     Si = np.arange(len(zs))
-    S[Si % 3 == 0] = 1
-    S[Si % 3 == 1] = 2
-    S[Si % 3 == 2] = 3
+    S[Si % 2 == 0] = 1
+    S[Si % 2 == 1] = 2
+    # S[Si % 3 == 2] = 3
     return np.dot(S, zs)
 
 n = 6

@@ -6,6 +6,7 @@ import scipy.linalg
 import scipy.optimize
 import networkx as nx
 from matplotlib import pyplot as plt
+import helpers
 
 # returns a cost function based on C_alpha, cost function returns 0 not all constraints are met
 def get_cost_fn(clauses, cost, nconstraints=0, constraint=None):
@@ -47,10 +48,20 @@ def get_mixer_hamiltonian(n):
 
 # build-your-own QAOA mixer hamiltonian
 def get_custom_mixer_hamiltonian(n, coeffs, paulis):
-    B = q.GeneralQuantumOperator(n)
+    M = q.GeneralQuantumOperator(n)
     for coef, pauli in zip(coeffs, paulis):
-        B.add_operator(q.PauliOperator(pauli, coef))
-    return B
+        M.add_operator(q.PauliOperator(pauli, coef))
+    return M
+
+
+def get_initial_state(constraint, n):
+    # start in superposition of feasable states
+    subspace = [i for i in range(2**n) if constraint(0, helpers.int2bits(i, n))]
+    initial_state = np.zeros(2**n)
+    for state in subspace:
+        initial_state[state] += 1
+    initial_state /= np.linalg.norm(initial_state)
+    return initial_state
 
 # returns e^{-i*t*H}
 def evolve(H, t, n):
@@ -58,7 +69,6 @@ def evolve(H, t, n):
 
 # use optimized paramaters to return final quantum circuit
 def get_circuit(n, p, C, B, gammas, betas, entangle=True):
-
     circ = q.QuantumCircuit(n)
     if entangle:
         for i in range(n):
@@ -66,21 +76,21 @@ def get_circuit(n, p, C, B, gammas, betas, entangle=True):
 
     for i in range(p):
         UC = evolve(C, gammas[i], n)
-        circ.add_gate(UC)
         UB = evolve(B, betas[i], n)
+
+        circ.add_gate(UC)
         circ.add_gate(UB)
-    
     return circ
+
 
 # function to maximize expectation
 def get_optimization_fn(n, p, C, B, initial_state=None):
-    
     def get_C_expectation(gamma_betas):
         gammas, betas = gamma_betas[:p], gamma_betas[p:]
         state = q.QuantumState(n)
         if initial_state is not None:
             state.load(initial_state)
-        # state.set_zero_state()
+
         circ = get_circuit(n, p, C, B, gammas, betas, entangle=(initial_state is None))
         circ.update_quantum_state(state)
         return -C.get_expectation_value(state).real

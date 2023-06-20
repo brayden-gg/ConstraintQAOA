@@ -9,24 +9,20 @@ from matplotlib import pyplot as plt
 import circuits
 import evaluate
 import helpers
+import rules_based_mixer
 
 p = 1 # layers of QAOA
 trials = 8 # how many times to run optimizer
 lam = 0 # penalty weight
+k = 3
 
-c = np.array([1, 2, 3, 4]) # vector to optimize with
 
-# constraints
-S = np.array([
-    [1, 2, 1, 2],
-    # [1, 2, 1, 0, 0, 0],
-    # [0, 0, 0, 1, 2, 1],
-])
-
-b = np.array([[2]])
-
-nconstraints = S.shape[0]
-n = len(c)
+def get_S(n, k):
+    S = np.zeros((1, n))
+    Si = np.arange(n)
+    for i in range(k):
+        S[0, Si % k == i] = i + 1
+    return S
 
 
 # Objective function: maximize c⋅z
@@ -43,30 +39,34 @@ def constraint(alpha, z):
 
 
 
-coefs = [(0.25+0j), (0.25+0j), (0.25+0j), (0.25+0j), (-0.125+0j), (0.125+0j), (0.25+0j), (0.125+0j), (0.375+0j), (0.25+0j), (0.25+0j), (-0.25+0j), (0.25+0j), (0.25+0j), (-0.125+0j), (0.125+0j), (0.25+0j), (-0.25+0j), (0.125+0j), (0.375+0j), (0.125+0j), (-0.125+0j), (0.125+0j), (-0.125+0j), (-0.125+0j), (0.125+0j), (-0.125+0j), (0.125+0j)]
-paulis = ['X 0 X 1 X 2 X 3', 'X 0 X 1 X 2', 'X 0 Y 1 X 2 Y 3', 'X 0 Y 1 Y 2', 'X 0 Z 1 X 2 Z 3', 'X 0 Z 1 X 2', 'X 0 X 2 X 3', 'X 0 X 2 Z 3', 'X 0 X 2', 'X 0 Y 2 Y 3', 'Y 0 X 1 Y 2 X 3', 'Y 0 X 1 Y 2', 'Y 0 Y 1 X 2', 'Y 0 Y 1 Y 2 Y 3', 'Y 0 Z 1 Y 2 Z 3', 'Y 0 Z 1 Y 2', 'Y 0 X 2 Y 3', 'Y 0 Y 2 X 3', 'Y 0 Y 2 Z 3', 'Y 0 Y 2', 'Z 0 X 1 Z 2 X 3', 'Z 0 X 1 X 3', 'Z 0 Y 1 Z 2 Y 3', 'Z 0 Y 1 Y 3', 'X 1 Z 2 X 3', 'X 1 X 3', 'Y 1 Z 2 Y 3', 'Y 1 Y 3']
-perm = np.arange(2**n)
 
-# coefs = [(0.25+0j), (0.25+0j), (-0.25+0j), (-0.25+0j), (-0.25+0j), (0.25+0j), (-0.25+0j), (0.25+0j), (0.25+0j), (0.25+0j), (0.25+0j), (-0.25+0j), (-0.25+0j), (-0.25+0j), (-0.25+0j), (0.25+0j), (0.25+0j), (0.25+0j), (-0.25+0j), (0.25+0j)]
-# paulis = ['X 0 X 1 X 2 X 3', 'X 0 X 1 X 2', 'X 0 X 1 Y 2 Y 3', 'X 0 Y 1 Y 2', 'X 0 Z 1 Z 3', 'X 0 Z 1', 'X 0 Z 3', 'X 0', 'Y 0 X 1 Y 2 Z 3', 'Y 0 Y 1 X 2 X 3', 'Y 0 Y 1 X 2 Z 3', 'Y 0 Y 1 Y 2 Y 3', 'Z 0 X 1 X 2 Z 3', 'Z 0 Y 1 Y 2 Z 3', 'Z 0 Z 1 X 3', 'Z 0 X 3', 'X 1 X 2', 'Y 1 Y 2', 'Z 1 X 3', 'X 3']
-# perm = np.array([11, 3, 9, 12, 5, 8, 13, 14, 15, 2, 1, 7, 10, 6, 4, 0])
+c = np.array([1, 2, 3, 4, 3, 2]) # vector to optimize with
+n = c.size
+# constraints
+S = get_S(n, k)
 
-invperm = np.argsort(perm)
+b = np.array([[4]])
 
-subspace = [i for i in range(2**n) if constraint(0, helpers.int2bits(invperm[i], n))]
+nconstraints = S.shape[0]
+
+# start in superposition of feasable states
+subspace = [i for i in range(2**n) if constraint(0, helpers.int2bits(i, n))]
 initial_state = np.zeros(2**n)
 for state in subspace:
-    initial_state[perm[state]] += 1
+    initial_state[state] += 1
 initial_state /= np.linalg.norm(initial_state)
     
 # get hamiltonians for running QAOA
 C = circuits.get_cost_hamiltonian(cost, range(n), n) #, penalty=penalty, lam=lam, nconstraints=nconstraints)
-B = circuits.get_custom_mixer_hamiltonian(n, coefs, paulis)
-opt_fn = circuits.get_optimization_fn(n, p, C, B, initial_state)
+# B = circuits.get_custom_mixer_hamiltonian(n, coefs, paulis)
+M = rules_based_mixer.get_minimal_mixer(n, k)
+opt_fn = circuits.get_optimization_fn(n, p, C, M, initial_state)
+
+assert helpers.preserves_subspace(lambda b: circuits.evolve(M, b, n).get_matrix(), subspace, n)
 
 # optimize over angles to produce a circuit
 F_max, gammas, betas = circuits.find_optimal_angles(opt_fn, trials, p)
-circ = circuits.get_circuit(n, p, C, B, gammas, betas, entangle=False)
+circ = circuits.get_circuit(n, p, C, M, gammas, betas, entangle=False)
 print(f"max <C> = {-F_max}")
 
 # run state through our circuit
