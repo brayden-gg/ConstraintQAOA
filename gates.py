@@ -53,50 +53,38 @@ def add_param_RYYX_gate(circ, i, j, k, theta):
     circ.add_parametric_multi_Pauli_rotation_gate([i, j, k], [2, 2, 1], theta)
 
 def add_F_gate(circ, i, j, k, theta):
+    # add_RXXX_gate(circ, i, j, k, -theta/2)
+    # add_RXYY_gate(circ, i, j, k, -theta/2)
+    # add_RYXY_gate(circ, i, j, k, -theta/2)
+    # add_RYYX_gate(circ, i, j, k, theta/2)
+
+    # XXX
+    circ.add_CNOT_gate(k, j)
+    circ.add_CNOT_gate(k, i)
+    circ.add_RX_gate(k, -theta/2)
+    circ.add_CNOT_gate(k, i)
+    circ.add_CNOT_gate(k, j)
+
+    # XYY
+    circ.add_RZ_gate(k, -np.pi/2)
+    circ.add_RZ_gate(j, -np.pi/2)
     add_RXXX_gate(circ, i, j, k, -theta/2)
-    add_RXYY_gate(circ, i, j, k, -theta/2)
-    add_RYXY_gate(circ, i, j, k, -theta/2)
-    add_RYYX_gate(circ, i, j, k, theta/2)
-
-    # # XXX
-    # circ.add_CNOT_gate(i, j)
-    # circ.add_CNOT_gate(i, k)
-    # circ.add_RX_gate(i, theta)
-    # circ.add_CNOT_gate(i, k)
-    # circ.add_CNOT_gate(i, j)
-
-    # # XYY
-    # circ.add_RZ_gate(k, -np.pi/2) # might also cancel?
-    # circ.add_RZ_gate(j, -np.pi/2)
-    # circ.add_CNOT_gate(i, j)
-    # circ.add_CNOT_gate(i, k)
-    # circ.add_RX_gate(i, theta)
-    # circ.add_CNOT_gate(i, k)
-    # circ.add_CNOT_gate(i, j)
-    # circ.add_RZ_gate(j, np.pi/2)
-    # # circ.add_RZ_gate(k, np.pi/2) # cancel!
-
-    # # YXY
-    # # circ.add_RZ_gate(k, -np.pi/2)
-    # circ.add_RZ_gate(i, -np.pi/2)
-    # circ.add_CNOT_gate(i, j)
-    # circ.add_CNOT_gate(i, k)
-    # circ.add_RX_gate(i, theta)
-    # circ.add_CNOT_gate(i, k)
-    # circ.add_CNOT_gate(i, j)
+    circ.add_RZ_gate(j, np.pi/2)
     # circ.add_RZ_gate(k, np.pi/2)
-    # # circ.add_RZ_gate(i, np.pi/2) # cancel!
 
-    # # YYX
-    # # circ.add_RZ_gate(i, -np.pi/2)
-    # circ.add_RZ_gate(j, -np.pi/2)
-    # circ.add_CNOT_gate(i, j)
-    # circ.add_CNOT_gate(i, k)
-    # circ.add_RX_gate(i, -theta)
-    # circ.add_CNOT_gate(i, k)
-    # circ.add_CNOT_gate(i, j)
-    # circ.add_RZ_gate(j, -np.pi/2)
+    # YXY
+    # circ.add_RZ_gate(k, -np.pi/2)
+    circ.add_RZ_gate(i, -np.pi/2)
+    add_RXXX_gate(circ, i, j, k, -theta/2)
+    circ.add_RZ_gate(k, np.pi/2)
+    # circ.add_RZ_gate(i, np.pi/2)
+    
+    # YYX
     # circ.add_RZ_gate(i, -np.pi/2)
+    circ.add_RZ_gate(j, -np.pi/2)
+    add_RXXX_gate(circ, k, j, i, theta/2)
+    circ.add_RZ_gate(j, np.pi/2)
+    circ.add_RZ_gate(i, np.pi/2)
 
 def add_param_F_gate(circ, i, j, k, theta):
     add_param_RXXX_gate(circ, i, j, k, -theta/2)
@@ -122,6 +110,23 @@ def add_UM(circ, beta, n, k):
     
     if n > k: # self-add only possible if repeats
         add_F_gate(circ, 0, k, 1, beta)
+
+# BILP mixer
+def add_UM_squared(circ, beta, n, k):
+    for i in range(n):
+        for j in range(i):
+            add_S_gate(circ, i, j, beta)
+
+    for i in range(0, n, k):
+        for j in range(1, n, k):
+            for k in range(2, n, k):
+                add_F_gate(circ, i, j, k, beta)
+    
+    if n > k: # self-add only possible if repeats
+        for i in range(0, n, k):
+            for j in range(i + k, n, k):
+                for k in range(i + 1, n, k):
+                    add_F_gate(circ, i, j, k, beta)
 
 # BILP mixer
 def add_param_UM(circ, beta, n, k):

@@ -199,24 +199,24 @@ for state in subspace:
 initial_state /= np.linalg.norm(initial_state)
 
 
-
+test_n = 6
 # Make sure custom operators have expected behavior
 def F(theta):
-    XXX = (q.Observable(6) + q.PauliOperator("X 0 X 1 X 2", 1)).get_matrix().todense()
-    XYY = (q.Observable(6) + q.PauliOperator("X 0 Y 1 Y 2", 1)).get_matrix().todense()
-    YXY = (q.Observable(6) + q.PauliOperator("Y 0 X 1 Y 2", 1)).get_matrix().todense()
-    YYX = (q.Observable(6) + q.PauliOperator("Y 0 Y 1 X 2", 1)).get_matrix().todense()
+    XXX = (q.Observable(test_n) + q.PauliOperator("X 0 X 1 X 2", 1)).get_matrix().todense()
+    XYY = (q.Observable(test_n) + q.PauliOperator("X 0 Y 1 Y 2", 1)).get_matrix().todense()
+    YXY = (q.Observable(test_n) + q.PauliOperator("Y 0 X 1 Y 2", 1)).get_matrix().todense()
+    YYX = (q.Observable(test_n) + q.PauliOperator("Y 0 Y 1 X 2", 1)).get_matrix().todense()
     F = 1/4 * (XXX + XYY + YXY - YYX)
     return sp.linalg.expm(-1j * F * theta)
 
 def S(theta):
-    XX = (q.Observable(6) + q.PauliOperator("X 0 X 3", 1)).get_matrix().todense()
-    YY = (q.Observable(6) + q.PauliOperator("Y 0 Y 3", 1)).get_matrix().todense()
+    XX = (q.Observable(test_n) + q.PauliOperator("X 0 X 3", 1)).get_matrix().todense()
+    YY = (q.Observable(test_n) + q.PauliOperator("Y 0 Y 3", 1)).get_matrix().todense()
     S = 1/2 * (XX + YY)
     return sp.linalg.expm(-1j * S * theta)
 
-for i in range(8):
-    for beta in np.linspace(0, np.pi*2, 20):
+for i in range(2**test_n):
+    for beta in np.linspace(0, np.pi*2, 10):
         F_state1 = helpers.int2state(i, 6)
         F_state2 = helpers.int2state(i, 6)
         F_sv = F_state2.get_vector()
@@ -242,8 +242,8 @@ for i in range(8):
         F_circ2.update_quantum_state(F_state2)
         F_sv = F_c3 @ F_sv
 
-        S_circ1.update_quantum_state(F_state1)
-        S_circ2.update_quantum_state(F_state2)
+        S_circ1.update_quantum_state(S_state1)
+        S_circ2.update_quantum_state(S_state2)
         S_sv = S_c3 @ S_sv
 
         
@@ -259,7 +259,7 @@ for i in range(8):
 assert helpers.preserves_subspace_gates(lambda c, b: gates.add_F_gate(c, 0, 1, 2, b), subspace, n)
 assert helpers.preserves_subspace_gates(lambda c, b: gates.add_S_gate(c, 0, 3, b), subspace, n)
 assert helpers.preserves_subspace_gates(lambda c, b: gates.add_S_gate(c, 0, 3, b), subspace, n)
-
+print("Subspace tests passed")
 # assert helpers.preserves_subspace_gates(lambda c, b: gates.add_param_F_gate(c, 0, 1, 2, b), subspace, n)
 # assert helpers.preserves_subspace_gates(lambda c, b: gates.add_param_F_gate(c, 0, 3, 1, b), subspace, n)
 # assert helpers.preserves_subspace_gates(lambda c, b: gates.add_param_S_gate(c, 0, 3, b), subspace, n)

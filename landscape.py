@@ -110,10 +110,10 @@ for lam in np.linspace(0, 2, steps):
     plt.imshow(-data, vmin=-3, vmax=3, interpolation="bicubic")
     plt.colorbar()
     plt.title(f"<C> for lambda = {round(lam, 2)}")
-    
+
     plt.xlabel("beta")
     plt.ylabel("gamma")
-    
+
 
     results.append({
         "lambda": lam,

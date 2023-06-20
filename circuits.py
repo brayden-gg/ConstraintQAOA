@@ -105,7 +105,7 @@ def find_optimal_angles(opt_fn, trials, p):
     bounds = [(0, np.pi * 2)] * (2 * p) # can be any angle between 0 and 2pi
     for _ in range(trials):
         x0 = np.random.rand(2*p) * np.pi * 2
-        f = opt_fn(x0)
+        f = opt_fn(x0) # BFGS
         if f < F_max:    
             optim_res = sp.optimize.minimize(opt_fn, x0=x0, bounds=bounds)
             F_max = optim_res["fun"]
