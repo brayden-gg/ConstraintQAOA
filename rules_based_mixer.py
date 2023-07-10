@@ -58,6 +58,20 @@ def get_F(i, j, k, n):
     return circuits.get_custom_mixer_hamiltonian(n, [1/4, 1/4, 1/4, -1/4],
                                           [f'X {i} X {j} X {k}', f'X {i} Y {j} Y {k}', f'Y {i} X {j} Y {k}', f'Y {i} Y {j} X {k}'])
 
+def get_F_mat(i, j, k, n):
+    XXX = (q.Observable(n) + q.PauliOperator(f"X {i} X {j} X {k}", 1)).get_matrix().todense()
+    XYY = (q.Observable(n) + q.PauliOperator(f"X {i} Y {j} Y {k}", 1)).get_matrix().todense()
+    YXY = (q.Observable(n) + q.PauliOperator(f"Y {i} X {j} Y {k}", 1)).get_matrix().todense()
+    YYX = (q.Observable(n) + q.PauliOperator(f"Y {i} Y {j} X {k}", 1)).get_matrix().todense()
+    F = 1/4 * (XXX + XYY + YXY - YYX)
+    return F
+
+def get_S_mat(i, j, n):
+    XX = (q.Observable(n) + q.PauliOperator(f"X {i} X {j}", 1)).get_matrix().todense()
+    YY = (q.Observable(n) + q.PauliOperator(f"Y {i} Y {j}", 1)).get_matrix().todense()
+    S = 1/2 * (XX + YY)
+    return S
+
 
 
     
@@ -66,13 +80,43 @@ def get_F(i, j, k, n):
 if __name__ == "__main__":
     M = get_minimal_mixer(6, 3)
     # helpers.print_terms(M.get_matrix().todense())
-    S1 = get_S(0, 3, 6)
-    S2 = get_S(1, 4, 6)
-    S3 = get_S(2, 5, 6)
-    F1 = get_F(0, 3, 1, 6)
-    F2 = get_F(0, 4, 2, 6)
+    I = np.eye(64, dtype=np.complex128)
+    
+    S1 = get_S_mat(0, 3, 6)
+    S2 = get_S_mat(1, 4, 6)
+    S3 = get_S_mat(2, 5, 6)
+    F1 = get_F_mat(0, 1, 2, 6)
+    F2 = get_F_mat(0, 3, 1, 6)
+    G = [I, S1, S2, S3, F1, F2]
+    gens = [I, S1, S2, S3, F1, F2]
+    G_names = ["I", "S03", "S14", "S25", "F123", "F031"]
+    gens_names = ["I", "S03", "S14", "S25", "F123", "F031"]
+    def is_in(T, G):
+        return np.any([np.all(T == t) for t in G])
+    
+    old_len = 0
+    new_len = 1
+    iters = 0
+    # while old_len != new_len:
+    #     G2 = G.copy()
+    #     G2_names = G_names.copy()
+    #     for A, A_name in zip(G2, G2_names):
+    #         for B, B_name in zip(gens, gens_names):
+    #             C = A @ B
+    #             if not is_in(C, G):
+    #                 G.append(C)
+    #                 G_names.append((A_name + " " + B_name).replace("I ", ""))
 
-
+    #             C = B @ A
+    #             if not is_in(C, G):
+    #                 G.append(C)
+    #                 G_names.append((B_name + " " + A_name).replace(" I", ""))
+    #     new_len = len(G)
+    #     old_len = len(G2)
+    #     iters += 1
+    #     print(iters, new_len)
+        
+        
     print(helpers.commutes(F1, F2))
     # F21 = get_F(0, 3, 1, 6)
     # F22 = get_F(0, 3, 4, 6)

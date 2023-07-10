@@ -53,44 +53,44 @@ def add_param_RYYX_gate(circ, i, j, k, theta):
     circ.add_parametric_multi_Pauli_rotation_gate([i, j, k], [2, 2, 1], theta)
 
 def add_F_gate(circ, i, j, k, theta):
-    # add_RXXX_gate(circ, i, j, k, -theta/2)
-    # add_RXYY_gate(circ, i, j, k, -theta/2)
-    # add_RYXY_gate(circ, i, j, k, -theta/2)
-    # add_RYYX_gate(circ, i, j, k, theta/2)
+    # add_RXXX_gate(circ, i, j, k, -theta)
+    # add_RXYY_gate(circ, i, j, k, -theta)
+    # add_RYXY_gate(circ, i, j, k, -theta)
+    # add_RYYX_gate(circ, i, j, k, theta)
 
     # XXX
     circ.add_CNOT_gate(k, j)
     circ.add_CNOT_gate(k, i)
-    circ.add_RX_gate(k, -theta/2)
+    circ.add_RX_gate(k, -theta)
     circ.add_CNOT_gate(k, i)
     circ.add_CNOT_gate(k, j)
 
     # XYY
     circ.add_RZ_gate(k, -np.pi/2)
     circ.add_RZ_gate(j, -np.pi/2)
-    add_RXXX_gate(circ, i, j, k, -theta/2)
+    add_RXXX_gate(circ, i, j, k, -theta)
     circ.add_RZ_gate(j, np.pi/2)
     # circ.add_RZ_gate(k, np.pi/2)
 
     # YXY
     # circ.add_RZ_gate(k, -np.pi/2)
     circ.add_RZ_gate(i, -np.pi/2)
-    add_RXXX_gate(circ, i, j, k, -theta/2)
+    add_RXXX_gate(circ, i, j, k, -theta)
     circ.add_RZ_gate(k, np.pi/2)
     # circ.add_RZ_gate(i, np.pi/2)
     
     # YYX
     # circ.add_RZ_gate(i, -np.pi/2)
     circ.add_RZ_gate(j, -np.pi/2)
-    add_RXXX_gate(circ, k, j, i, theta/2)
+    add_RXXX_gate(circ, k, j, i, theta)
     circ.add_RZ_gate(j, np.pi/2)
     circ.add_RZ_gate(i, np.pi/2)
 
 def add_param_F_gate(circ, i, j, k, theta):
-    add_param_RXXX_gate(circ, i, j, k, -theta/2)
-    add_param_RXYY_gate(circ, i, j, k, -theta/2)
-    add_param_RYXY_gate(circ, i, j, k, -theta/2)
-    add_param_RYYX_gate(circ, i, j, k, theta/2)
+    add_param_RXXX_gate(circ, i, j, k, -theta)
+    add_param_RXYY_gate(circ, i, j, k, -theta)
+    add_param_RYXY_gate(circ, i, j, k, -theta)
+    add_param_RYYX_gate(circ, i, j, k, theta)
 
 def add_S_gate(circ, i, j, theta):
     add_RXX_gate(circ, i, j, theta)
@@ -102,9 +102,14 @@ def add_param_S_gate(circ, i, j, theta):
 
 # BILP mixer
 def add_UM(circ, beta, n, k):
-    for i in range(n - k):
-        add_S_gate(circ, i, i + k, beta)
+    for i in range(0, n - k, 2*k):
+        for j in range(0, k):
+            add_S_gate(circ, i + j, i + j + k, beta)
 
+    for i in range(0, n - k, 2*k):
+        for j in range(0, k):
+            add_S_gate(circ, i + j, i + j + k, beta)
+    
     for i in range(1, k - 1):
         add_F_gate(circ, 0, i, i + 1, beta)
     
@@ -112,32 +117,44 @@ def add_UM(circ, beta, n, k):
         add_F_gate(circ, 0, k, 1, beta)
 
 # BILP mixer
-def add_UM_squared(circ, beta, n, k):
-    for i in range(n):
-        for j in range(i):
-            add_S_gate(circ, i, j, beta)
+def add_UM_medium_dense(circ, beta, n, k):
+    # split S gates into two sections to overlap zi = z(i + k)
+    for i in range(0, n - k, 2*k):
+        for j in range(0, k):
+            add_S_gate(circ, i + j, i + j + k, beta)
+            # print(f"S_{i + j},{i + j + k}")
 
+    for i in range(0, n - k, 2*k):
+        for j in range(0, k):
+            add_S_gate(circ, i + j, i + j + k, beta)
+            # print(f"S_{i + j},{i + j + k}")
+
+    # only need one layer for z1 + zk -> z(k + 1)
     for i in range(0, n, k):
-        for j in range(1, n, k):
-            for k in range(2, n, k):
-                add_F_gate(circ, i, j, k, beta)
+        for j in range(1, k - 1):
+            add_F_gate(circ, i, i + j, i + j + 1, beta)
+            # print(f"F_{i},{i + j},{i+j+1}")
     
-    if n > k: # self-add only possible if repeats
-        for i in range(0, n, k):
-            for j in range(i + k, n, k):
-                for k in range(i + 1, n, k):
-                    add_F_gate(circ, i, j, k, beta)
+    # two layers for 
+    for i in range(0, n - k, 2*k):
+        add_F_gate(circ, i, i + k, i + 1, beta)
+        # print(f"F_{i},{i + k},{i+1}")
 
-# BILP mixer
-def add_param_UM(circ, beta, n, k):
-    for i in range(n - k):
-        add_param_S_gate(circ, i, i + k, beta)
+    for i in range(k, n - k, 2*k):
+        add_F_gate(circ, i, i + k, i + 1, beta)
+        # print(f"F_{i},{i +k},{i+1}")
 
-    for i in range(1, k - 1):
-        add_param_F_gate(circ, 0, i, i + 1, beta)
+# # BILP mixer
+# def add_param_UM(circ, beta, n, k):
+#     for j in range(1, k):
+#         for i in range(0, n, k):
+#             add_param_S_gate(circ, i + j, i + j + k, beta)
+
+#     for i in range(1, k - 1):
+#         add_param_F_gate(circ, 0, i, i + 1, beta)
     
-    if n > k: # self-add only possible if repeats
-        add_param_F_gate(circ, 0, k, 1, beta)
+#     if n > k: # self-add only possible if repeats
+#         add_param_F_gate(circ, 0, k, 1, beta)
 
 # BILP cost fn
 def add_UC(circ, gamma, c):
@@ -146,11 +163,14 @@ def add_UC(circ, gamma, c):
         circ.add_RZ_gate(i, -gamma * ci/2)
 
 
-def get_circuit(n, k, c, gammas, betas):
+def get_circuit(n, k, c, gammas, betas, dense=True):
     circ = q.QuantumCircuit(n)
     for gamma, beta in zip(gammas, betas):
         add_UC(circ, gamma, c)
-        add_UM(circ, beta, n, k)
+        if dense:
+            add_UM_medium_dense(circ, beta, n, k)
+        else:
+            add_UM(circ, beta, n, k)
     
     return circ
 
@@ -164,3 +184,4 @@ def get_optimization_fn(n, k, c, p, initial_state, C):
         return -C.get_expectation_value(state).real
     
     return get_C_expectation
+

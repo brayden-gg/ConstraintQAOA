@@ -32,7 +32,7 @@ def get_expectation_func(c, b, n, k, p):
         
     # get hamiltonians for running QAOA
     C = circuits.get_cost_hamiltonian(cost, range(n), n)
-    opt_fn = gates.get_optimization_fn(n, k, c, p, initial_state, C)
+    # opt_fn = gates.get_optimization_fn(n, k, c, p, initial_state, C)
     nconstraints = S.shape[0]
 
     overall_cost_fn = circuits.get_cost_fn(range(n), cost, nconstraints, constraint)
@@ -60,7 +60,7 @@ def get_expectation_func(c, b, n, k, p):
 
 
 
-pi = [3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5, 8, 9, 7, 9, 3, 2, 3, 8, 4, 6, 2, 6, 4, 3, 3, 8, 3, 2, 7, 9, 5, 0, 2, 8, 8, 4, 1, 9, 7, 1, 0, 5]
+# pi = [3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5, 8, 9, 7, 9, 3, 2, 3, 8, 4, 6, 2, 6, 4, 3, 3, 8, 3, 2, 7, 9, 5, 0, 2, 8, 8, 4, 1, 9, 7, 1, 0, 5]
 
 
 
@@ -69,7 +69,7 @@ bounds = [(0, np.pi * 2)] * (2 * p) # can be any angle between 0 and 2pi
 # tol = 0.001
 resolution = 50
 steps = 21
-folder = "./results/Subspace"
+folder = "./results/Subspace/ones"
 
 offset = 6
 n = 6
@@ -77,35 +77,43 @@ k = 3
 b0 = 7
 p = 1
 
-for n in [6, 9, 12]:
-    for offset in [0, 1, 2, 6, 12]:
-        for b0 in range(1, 12):
-            c = np.array(pi[offset:n+offset]) # vector to optimize with
-            # constraints
-            S = get_S(n, k)
-            b = np.array([[b0]])
+# plt.rcParams.update({'font.size': 22})
+
+for n in [6]: #, 9, 12]:
+    # for offset in [0, 1, 2, 6, 12]:
+    for b0 in [7]: #[1,5,7,10]:
+        if b0 > n*(k-1):
+            continue
+        # c = np.array(pi[offset:n+offset]) # vector to optimize with
+        c = np.ones(n)
+        # constraints
+        S = get_S(n, k)
+        b = np.array([[b0]])
 
 
-            metrics_fn = get_expectation_func(c, b, n, k, p)
-            domain = np.linspace(0, 2*np.pi, resolution)
-            inputs = np.meshgrid(*([domain] * (2*p)),  indexing='ij')
+        metrics_fn = get_expectation_func(c, b, n, k, p)
+        domain = np.linspace(0, 2*np.pi, resolution)
+        inputs = np.meshgrid(*([domain] * (2*p)),  indexing='ij')
 
-            approx_ratio, P_max = metrics_fn(*inputs)
+        approx_ratio, P_max = metrics_fn(*inputs)
 
-            fig = plt.figure()
-            plt.imshow(approx_ratio, interpolation="bicubic", extent=[0,np.pi*2,0,np.pi*2])
-            plt.colorbar()
-            plt.title(f"Approximation Ratio for n={n}, k={k}, p={p}, b={b[0, 0]}, offset={offset}")
-            plt.xlabel("beta")
-            plt.ylabel("gamma")
-            plt.savefig(f"{folder}/n={n}_offset={offset}_G2/heatmap_k={k}_b={b[0, 0]}_o={offset}_approx_ratio.png")
-            plt.close()
+        fig = plt.figure()
+        plt.imshow(approx_ratio, interpolation="bicubic", extent=[0,np.pi*2,0,np.pi*2], vmin=0, vmax=1)
+        cbar = plt.colorbar()
+        plt.title(f"Approximation Ratio for N={n}, k={k}", size=20)
+        plt.xlabel("beta", size=20)
+        plt.ylabel("gamma", size=20)
+        plt.tick_params(labelsize=18)
+        cbar.ax.tick_params(labelsize=18)
+        # plt.xticks(size=12)
+        plt.show() #(f"{folder}/n={n}/heatmap_k={k}_b={b[0, 0]}_approx_ratio.png")
+        # plt.close()
 
-            fig = plt.figure()
-            plt.imshow(P_max, interpolation="bicubic", extent=[0,np.pi*2,0,np.pi*2])
-            plt.colorbar()
-            plt.title(f"Probability of optimal solution for n={n}, k={k}, p={p}, b={b[0, 0]}, offset={offset}")
-            plt.xlabel("beta")
-            plt.ylabel("gamma")
-            plt.savefig(f"{folder}/n={n}_offset={offset}_G2/heatmap_k={k}_b={b[0, 0]}_o={offset}_Pmax.png")
-            plt.close()
+        # fig = plt.figure()
+        # plt.imshow(P_max, interpolation="bicubic", extent=[0,np.pi*2,0,np.pi*2], vmin=0, vmax=1)
+        # plt.colorbar()
+        # plt.title(f"Probability of optimal solution for n={n}, k={k}, p={p}, b={b[0, 0]}")
+        # plt.xlabel("beta")
+        # plt.ylabel("gamma")
+        # plt.savefig(f"{folder}/n={n}/heatmap_k={k}_b={b[0, 0]}_Pmax.png")
+        # plt.close()

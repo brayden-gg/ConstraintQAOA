@@ -12,7 +12,7 @@ import helpers
 import rules_based_mixer
 
 p = 1 # layers of QAOA
-trials = 8 # how many times to run optimizer
+trials = 50 # how many times to run optimizer
 lam = 0 # penalty weight
 k = 3
 

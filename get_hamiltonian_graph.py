@@ -5,6 +5,7 @@ import scipy.linalg
 import itertools
 import networkx as nx
 import helpers
+import re
 
 def get_M_from_graph(feasable, G):
     M = np.zeros((2 ** n, 2**n), dtype=np.complex128)
@@ -59,8 +60,32 @@ def print_terms(M):
     print(f"{len(coefs)} terms:")
     # for gates, coef in terms:
     #     print(f"{coef} * {gate_string(gates)}")
+    pstr = ""
+    for i in range(len(coefs)):
+        pi = re.sub("\d|\s", "", str(paulis[i]))
+        if coefs[i] < 0:
+            pstr  += "-" + pi + ","
+        else: 
+            pstr += "+" + pi + ","
+
     print("coefs = " + str(coefs))
-    print("paulis = " + str(paulis))
+    print("paulis = " + pstr)
+
+def pauli_set(M):
+    coefs, paulis = get_terms(M)
+    print(f"{len(coefs)} terms:")
+    # for gates, coef in terms:
+    #     print(f"{coef} * {gate_string(gates)}")
+    pset = set()
+    for i in range(len(coefs)):
+        pi = re.sub("\d|\s", "", str(paulis[i]))
+        if coefs[i] < 0:
+            pset.add("-" + pi)
+        else: 
+            pset.add("+" + pi)
+
+    return pset
+
 
 #  check if communites with Σ Zi
 def check_commutator(M):
@@ -81,7 +106,7 @@ def constraint(zs):
     # S[Si % 3 == 2] = 3
     return np.dot(S, zs)
 
-n = 6
+
 XYZI = ["I", "X", "Y", "Z"]
 # nfeasable =  6
 # feasable = np.random.choice(range(2**n), nfeasable, replace=False).tolist()
@@ -93,55 +118,47 @@ XYZI = ["I", "X", "Y", "Z"]
 # G.remove_edge(*E[len(E)//2])
 # G = nx.complete_graph(nfeasable)
 # M = get_M_from_graph(feasable, G)
-buckets = []
-for i in range(3 * n//2 + 1):
-    buckets.append([])
+# buckets = []
+# for i in range(3 * n//2 + 1):
+#     buckets.append([])
 
-for i in range(2 ** n):
-    bits = helpers.int2bits(i, n)
-    b = constraint(bits)
-    buckets[b].append(i)
+# for i in range(2 ** n):
+#     bits = helpers.int2bits(i, n)
+#     b = constraint(bits)
+#     buckets[b].append(i)
 
-b = 3
-edges = []
-bucket = buckets[b]
-# bucket.append(bucket[0])
-# for bucket in buckets:
-# edges += [(a, b) for a, b in zip(bucket, bucket[1:] + [bucket[0]])]
-edges = [
-                  (1, 4), # b = 1
-                  (2, 5), (5, 8), (8, 2),# b = 2
-                  (3, 6), (6, 9), (9, 12), (12, 3),# b = 3
-                  (7, 10), (10, 13), (13, 7), # b = 4
-                  (7, 13), # b = 5
-                  ]
-best_M = None
-best_perm = None
-least_terms = np.inf
-print(edges)
-# for i in range(500):
-perm = np.arange(2**n)
-# np.random.shuffle(perm)
-perm_edges = [(perm[a], perm[b]) for a, b in edges]
-# print(perm)
 
+
+n = 6
+edges = [(2**(n - 1), 2**(n - 1)-1), (2**(n - 1)-1, 2**(n - 1))]
 G = nx.Graph()
 G.add_nodes_from(range(2**n))
-G.add_edges_from(perm_edges)
+G.add_edges_from(edges)
 M = nx.adjacency_matrix(G)
-feasable = perm[buckets[b]]
-nfeasable = len(feasable)
-# assert preserves_subspace(M, feasable)
 coefs, paulis = get_terms(M)
-if len(coefs) < least_terms:
-    least_terms = len(coefs)
-    best_M = M
-    best_perm = perm
-    
+s6 = pauli_set(M)
 
-print(f"{nfeasable} states: {[bin(s)[2:].zfill(n) for s in feasable]}")
-print_terms(best_M)
-print(best_perm.tolist())
+n = 5
+edges = [(2**(n - 1), 2**(n - 1)-1), (2**(n - 1)-1, 2**(n - 1))]
+G = nx.Graph()
+G.add_nodes_from(range(2**n))
+G.add_edges_from(edges)
+M = nx.adjacency_matrix(G)
+coefs, paulis = get_terms(M)
+s5 = pauli_set(M)
+
+n = 4
+edges = [(2**(n - 1), 2**(n - 1)-1), (2**(n - 1)-1, 2**(n - 1))]
+G = nx.Graph()
+G.add_nodes_from(range(2**n))
+G.add_edges_from(edges)
+M = nx.adjacency_matrix(G)
+coefs, paulis = get_terms(M)
+s5 = pauli_set(M)
+
+print("cool")
+
+# print(best_perm.tolist())
 
 
 # nonzero = np.where(M0 != 0)

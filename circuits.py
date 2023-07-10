@@ -2,8 +2,7 @@
 import qulacs as q
 import numpy as np
 import scipy as sp
-import scipy.linalg
-import scipy.optimize
+
 import networkx as nx
 from matplotlib import pyplot as plt
 import helpers
@@ -53,6 +52,12 @@ def get_custom_mixer_hamiltonian(n, coeffs, paulis):
         M.add_operator(q.PauliOperator(pauli, coef))
     return M
 
+def get_hamiltonian_terms(n, coeffs, paulis):
+    ops = []
+    for coef, pauli in zip(coeffs, paulis):
+        mat  = (q.Observable(n) + q.PauliOperator(pauli, coef)).get_matrix().todense()
+        ops.append(mat)
+    return ops
 
 def get_initial_state(constraint, n):
     # start in superposition of feasable states
@@ -65,7 +70,7 @@ def get_initial_state(constraint, n):
 
 # returns e^{-i*t*H}
 def evolve(H, t, n):
-    return q.gate.SparseMatrix(range(n), sp.linalg.expm(-1j * t * H.get_matrix()))
+    return q.gate.SparseMatrix(range(n), sp.linalg.expm(-1j * t * H.get_matrix().todense()))
 
 # use optimized paramaters to return final quantum circuit
 def get_circuit(n, p, C, B, gammas, betas, entangle=True):
@@ -96,19 +101,3 @@ def get_optimization_fn(n, p, C, B, initial_state=None):
         return -C.get_expectation_value(state).real
     
     return get_C_expectation
-
-# find optimal gammas and betas to maximize the optimization function
-def find_optimal_angles(opt_fn, trials, p):
-    gammas = None
-    betas = None
-    F_max = np.inf
-    bounds = [(0, np.pi * 2)] * (2 * p) # can be any angle between 0 and 2pi
-    for _ in range(trials):
-        x0 = np.random.rand(2*p) * np.pi * 2
-        f = opt_fn(x0) # BFGS
-        if f < F_max:    
-            optim_res = sp.optimize.minimize(opt_fn, x0=x0, bounds=bounds)
-            F_max = optim_res["fun"]
-            gammas, betas = optim_res["x"][:p], optim_res["x"][p:]
-
-    return F_max, gammas, betas
