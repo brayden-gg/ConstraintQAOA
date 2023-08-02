@@ -26,6 +26,8 @@ c = np.ones(n)
 S = np.array([[1, 2, 3] * (n//k)]) # constraint equation coeffieicnts
 b = np.array([[7]])
 
+trials = 100
+
 # set initial guess for gammas and betas
 # gammas = np.array([1.543602762273278, 0.12964459636345538, 6.191372076992037])
 # betas = np.array([2.7424737009188735, 3.19068682207466, 10.952967842072791])
@@ -53,7 +55,7 @@ print("running optimizers")
 # use some combination of the next few lines with different numbers of trials to improve gammas and betas
 F_max, gammas, betas = optimize.scipy_optimize(opt_fn, p, trials=2, x0=[*gammas, *betas], method="BFGS")
 F_max, gammas, betas = optimize.alternating_minimization(opt_fn, trials=3, p=p, optimizer=optimize.grid_search, x0=[*gammas, *betas], res=30)
-F_max, gammas, betas = optimize.scipy_optimize(opt_fn, p, trials=15, x0=[*gammas, *betas])
+F_max, gammas, betas = optimize.scipy_optimize(opt_fn, p, trials=trials, x0=[*gammas, *betas])
 print("finished optimizing")
 
 print("\nFinal result:")
