@@ -14,32 +14,23 @@ import helpers
 import optimize
 
 
-def get_S(n, k):
-    S = np.zeros((1, n))
-    Si = np.arange(n)
-    for i in range(k):
-        S[0, Si % k == i] = i + 1
-    return S
-
 # Objective function: maximize c⋅z
 def cost(_, z): 
     return np.dot(z, c)
 
-
 def constraint(alpha, z):
     return np.dot(z, S[alpha, :]) == b[alpha, 0]
 
+# hyperparameters
 p = 1 # layers of QAOA
 k = 3
+n = 6
 
-n = 9
-
-# reward
+# reward function coefficients
 c = np.ones(n)
-# c = np.array([3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5, 8, 9, 7, 9, 3, 2, 3, 8, 4, 6, 2, 6, 4][:n]) # vector to optimize with
 
 # constraint
-S = get_S(n, k)
+S = np.array([[1, 2, 3] * (n//k)]) # constraint equation coeffieicnts
 b = np.array([[7]])
 
 nconstraints = S.shape[0]
@@ -49,21 +40,25 @@ initial_state = circuits.get_initial_state(constraint, n)
 C = circuits.get_cost_hamiltonian(cost, range(n), n)
 opt_fn = gates.get_optimization_fn(n, k, c, p, initial_state, C)
 
-# optimize over angles to produce a circuit
-gammas = [0, 10.744952256280623, 10.2088602668362, 10.305926727639305, 2.857936663144709, 8.642103069526074]
-betas = [0, 0.17501806415319396, 0.09740271666347408, 12.311337022282833, 3.4831858746485564, 6.495813767349775]
+# set initial guess for gammas and betas
+# gammas = np.array([1.543602762273278, 0.12964459636345538, 6.191372076992037])
+# betas = np.array([2.7424737009188735, 3.19068682207466, 10.952967842072791])
+gammas = np.zeros(p)
+betas = np.zeros(p)
+F_max = 0
 
-F_max, gammas, betas = optimize.scipy_optimize(opt_fn, p, trials=15, x0=[*gammas, *betas], method="BFGS")
+print("running optimizers")
+# use some combination of the next few lines with different numbers of trials to improve gammas and betas
+F_max, gammas, betas = optimize.scipy_optimize(opt_fn, p, trials=2, x0=[*gammas, *betas], method="BFGS")
+F_max, gammas, betas = optimize.alternating_minimization(opt_fn, trials=3, p=p, optimizer=optimize.grid_search, x0=[*gammas, *betas], res=30)
+F_max, gammas, betas = optimize.scipy_optimize(opt_fn, p, trials=15, x0=[*gammas, *betas])
+print("finished optimizing")
 
-# F_max, gammas, betas = optimize.alternating_minimization(opt_fn, trials=3, p=p, optimizer=optimize.grid_search, x0=[*gammas, *betas], res=30)
-
-# F_max, gammas, betas = optimize.scipy_optimize(opt_fn, p, trials=15, x0=[*gammas, *betas])
-# print(F_max)
-
+print("\nFinal result:")
 print("gammas, betas:")
 print("gammas = " + str(gammas.tolist()))
 print("betas = " + str(betas.tolist()))
-# print(f"max <C> = {-F_max}")
+print(f"max <C> = {-F_max}")
 
 circ = gates.get_circuit(n, k, c, gammas, betas)
 
@@ -106,7 +101,8 @@ v = np.zeros(2 ** n)
 v[global_opt_ind] = 1
 s.load(v)
 EV = C.get_expectation_value(s).real
-print(f"found global optimum {global_opt_state} with value {f_max} with probability {probabilities[global_opt_ind]}, <C>: {EV}")
-print(f"p: {p}, approximation ratio: {approx_ratio}, P(f_max) = {prob_of_max}, P(f_min) = {prob_min}")
+global_opt_bitstring = "".join([str(e) for e in global_opt_state])
+print(f"Classical algorithm: global max |{global_opt_bitstring}> with cost {f_max}")
+print(f"Quantum simulation: (p = {p}), Approximation Ratio: {approx_ratio}, P(optimal) = {prob_of_max}")
 # print(f"{n},{p},{k},{approx_ratio},{prob_of_max.round(5)},{prob_min.round(5)}")
 

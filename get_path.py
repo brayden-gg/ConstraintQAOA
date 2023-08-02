@@ -5,45 +5,49 @@ import numpy as np
 def S(z, i, j):
     if f"S_{i},{j}" not in valid_S:
         raise Exception(f"invalid S_{i},{j}")
-    i, j = pi(i), pi(j)
     z = z.copy()
     if z[i] == z[j]:
-        raise Exception(f"Swap can't swap equal z_{pinv(i)} = z_{pinv(j)} = {z[i]}")
+        raise Exception(f"Swap can't swap equal z_{i} = z_{j} = {z[i]}")
     z[i], z[j] = 1 - z[i], 1 - z[j]
     return z
 
 def F(z, i, j, l):
     if f"F_{i},{j},{l}" not in valid_F:
         raise Exception(f"invalid F_{i},{j},{l}")
-    i, j, l = pi(i), pi(j), pi(l)
     z = z.copy()
     if not z[i] == z[j] == 1 - z[l]:
-        raise Exception(f"Fuse can't understand {pinv(i)},{pinv(j)},{pinv(l)} = {z[i]},{z[j]},{z[l]}")
+        raise Exception(f"Fuse can't understand {i},{j},{l} = {z[i]},{z[j]},{z[l]}")
     z[i], z[j], z[l] = 1 - z[i], 1 - z[j], 1 - z[l]
     return z
 
-def pi(i):
-    r = (-i - 1) % k
-    c = i//k
-    return  r * cols + c
+# def pi(i):
+#     r = (-i - 1) % k
+#     c = i//k
+#     return  r * cols + c
 
-def pinv(i):
-    r = (-i - 1) % cols
-    c = i//cols
-    return n - 1 - (r * k + c)
+# def pinv(i):
+#     r = (-i - 1) % cols
+#     c = i//cols
+#     return n - 1 - (r * k + c)
+
+def tau(i, j):
+    return k*(j+1) - i - 1
+
+def phi(i, j):
+    return i*cols + j + 1
 
 def eval(z):
-    
     return np.dot(z, coefs)
 
 def get_w(z, b=None):
     if b is None:
         b = eval(z)
     w = [0] * len(z)
-    for i in range(len(z)):
-        if b - coefs[i] >= 0:
-            w[i] = 1
-            b -= coefs[i]
+    for r in range(k):
+        for c in range(cols):
+            if b - coefs[tau(r, c)] >= 0:
+                w[tau(r, c)] = 1
+                b -= coefs[tau(r, c)]
         
     return w
 
@@ -53,18 +57,28 @@ def d(z, w):
             return 1/(i+1)
     return 0
 
+def score(z):
+    sc = 0
+    for i in range(k):
+        for j in range(cols):
+            sc += i/(i+1) * z[tau(i, j)]
+
+    return sc
+
 def get_path(z):
     w = get_w(z)
     P = []
     iters = 0
     z = shift_all_left(z, P)
-    while d(z, w) != 0:
+    while score(z) > score(w):
         # get row with too many ones in z
         upward_row = -1
         for r in range(1, k):
-            r_prev = r-1
-            if sum(w[r*cols:(r+1)*cols]) < sum(z[r*cols:(r+1)*cols]) or \
-                sum(z[r*cols:(r+1)*cols]) == cols and sum(w[r_prev*cols:(r_prev+1)*cols]) > sum(z[r_prev*cols:(r_prev+1)*cols]) :
+            c_w = sum([w[tau(r, i)] for i in range(cols)])
+            c_z = sum([z[tau(r, i)] for i in range(cols)])
+            c_wprev = sum([w[tau(r-1, i)] for i in range(cols)])
+            c_zprev = sum([z[tau(r-1, i)] for i in range(cols)])
+            if c_w < c_z or c_z == cols and c_wprev > c_zprev:
                 upward_row = r
                 break
 
@@ -80,8 +94,8 @@ def get_path(z):
             P.append(f"F_{0},{k},{1}")
             z = F(z, 0, k, 1)
         else:
-            P.append(f"F_{0},{(k - 1) - upward_row},{(k - 1) - upward_row + 1}")
-            z = F(z, 0, (k - 1) - upward_row, (k - 1) - upward_row + 1)
+            P.append(f"F_{0},{tau(upward_row, 0)},{tau(upward_row - 1, 0),}")
+            z = F(z, 0, tau(upward_row, 0), tau(upward_row - 1, 0))
 
         z = shift_all_left(z, P)
 
@@ -94,33 +108,38 @@ def get_path(z):
     return P, z
 
 def ensure_ones_available(z, P):
-    has_ones = np.any(z[-cols:] == np.ones(cols))
-        
+    row =  [z[tau(k-1, i)] for i in range(cols)]
+    has_ones = np.any(row == np.ones(cols))
+    ntimes = 0
     while not has_ones: # no ones, make one
         last_row = -1
         for r in range(k):
-            if z[pi(r)] == 1:
+            if z[tau(r, 0)] == 1:
                 last_row = r
-                break
-        if last_row == 1:
+
+        if last_row == k - 2:
             P.append(f"F_{0},{k},{1}")
             z = F(z, 0, k, 1)
         else:
-            P.append(f"F_{0},{last_row-1},{last_row}")
-            z = F(z, 0, last_row-1, last_row)
-        has_ones = np.any(z[-cols:] == np.ones(cols))
+            P.append(f"F_{0},{tau(last_row+1, 0)},{tau(last_row, 0)}")
+            z = F(z, 0, tau(last_row+1, 0), tau(last_row, 0))
 
+        row =  [z[tau(k-1, i)] for i in range(cols)]
+        has_ones = np.any(row == np.ones(cols))
+        ntimes += 1
+        if ntimes > 1:
+            print("WTF")
     return z
 
 def unfill_left_col(z, P, r):
-    if np.all(z[r*cols:(r+1)*cols] == np.ones(cols)):
+    row = [z[tau(r, i)] for i in range(cols)]
+    if np.all(row == np.ones(cols)):
         raise Exception(f"Row {r} is filled :(")
     
-    for c in range(cols - 1, 0, -1):
-        i = r * cols + c
-        if z[i] != z[i - 1]:
-            P.append(f"S_{pinv(i)},{pinv(i - 1)}")
-            z[:] = S(z, pinv(i - 1), pinv(i))
+    for i in range(cols - 1, 0, -1):
+        if z[tau(r, i)] != z[tau(r, i-1)]:
+            P.append(f"S_{tau(r, i-1)},{tau(r, i)}")
+            z[:] = S(z, tau(r, i-1), tau(r, i))
     return z
 
 
@@ -128,27 +147,26 @@ def shift_all_left(z, P):
     for r in range(k):
         # run bubble sort on each row
         for l in range(cols):
-            for j in range(r*cols, (r+1)*cols-l-1):
-                if z[j] < z[j+1]:
-                    P.append(f"S_{pinv(j)},{pinv(j+1)}")
-                    z = S(z, pinv(j), pinv(j+1))
+            for j in range(cols - 1):
+                if z[tau(r, j)] < z[tau(r, j+1)]:
+                    P.append(f"S_{tau(r, j)},{tau(r, j+1)}")
+                    z = S(z, tau(r, j), tau(r, j+1))
     return z       
 
 
 
 for i in range(5000):
+    # cols = 4
+    # k = 6
     cols = np.random.randint(2, 15)
     k = np.random.randint(2, 15)
     n = k * cols
     z0 = np.random.randint(2, size=k * cols)
-
-# z0 = np.array([0, 0, 0, 1, 0, 1, 1, 1, 0, 0, 0, 1, 1, 0, 0, 1, 1, 1, 0, 0, 0, 0,
-#        1, 0])
-# cols = 3
-# k = 8
-# n = n = k * cols
-
-    coefs = [i for i in range(k,0,-1) for j in range(cols)]
+    # z0 = np.array([1, 0, 1, 0,
+    #                0, 0, 0, 0,
+    #                0, 0, 0, 0,
+    #                0, 0, 0, 0])
+    coefs = [j+1 for i in range(cols) for j in range(k)]
     valid_S = [f"S_{i},{i+k}" for i in range(n - k)]
     valid_F = [f"F_{0},{i},{i+1}" for i in range(1, k)]
     valid_F.append(f"F_0,{k},1")

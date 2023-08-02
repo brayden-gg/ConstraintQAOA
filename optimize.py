@@ -14,15 +14,15 @@ def scipy_optimize(opt_fn, p, x0=None, trials=50, method=None):
             F_max = opt_fn(x0)
             gammas = np.array(x0[:p])
             betas = np.array(x0[p:])
-            print(F_max)
         else:
             x0 = np.random.rand(2*p) * np.pi * 4
             
         optim_res = sp.optimize.minimize(opt_fn, x0=x0, bounds=bounds, method=method)
         if optim_res["fun"] < F_max:
             F_max = optim_res["fun"]
-            print(F_max)
+            
             gammas, betas = optim_res["x"][:p] % (np.pi * 4), optim_res["x"][p:] % (np.pi * 4)
+            print(f"New local opt: {F_max}")
             print("gammas = " + str(gammas.tolist()))
             print("betas = " + str(betas.tolist()))
 
